@@ -1,162 +1,97 @@
 const header = document.querySelector('.site-header');
 const menuButton = document.querySelector('.menu-toggle');
 const nav = document.querySelector('.main-nav');
-const body = document.body;
+const page = document.body;
 
 function syncHeader() {
-  header.classList.toggle('scrolled', window.scrollY > 20);
+  header.classList.toggle('scrolled', window.scrollY > 24);
+}
+
+function closeMenu() {
+  nav.classList.remove('open');
+  page.classList.remove('menu-open');
+  menuButton.setAttribute('aria-expanded', 'false');
+  menuButton.setAttribute('aria-label', 'Abrir menu');
 }
 
 syncHeader();
 window.addEventListener('scroll', syncHeader, { passive: true });
 
-function closeMenu() {
-  nav.classList.remove('open');
-  body.classList.remove('menu-open');
-  menuButton.setAttribute('aria-expanded', 'false');
-  menuButton.setAttribute('aria-label', 'Abrir menu');
-}
-
 menuButton.addEventListener('click', () => {
-  const isOpen = menuButton.getAttribute('aria-expanded') === 'true';
-  if (isOpen) {
+  const open = menuButton.getAttribute('aria-expanded') === 'true';
+
+  if (open) {
     closeMenu();
     return;
   }
 
   nav.classList.add('open');
-  body.classList.add('menu-open');
+  page.classList.add('menu-open');
   menuButton.setAttribute('aria-expanded', 'true');
   menuButton.setAttribute('aria-label', 'Fechar menu');
 });
 
-nav.querySelectorAll('a').forEach((link) => {
-  link.addEventListener('click', closeMenu);
+nav.querySelectorAll('a').forEach((link) => link.addEventListener('click', closeMenu));
+
+window.addEventListener('resize', () => {
+  if (window.innerWidth > 820) closeMenu();
 });
 
-window.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape') closeMenu();
-});
-
-const revealItems = document.querySelectorAll('.reveal');
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const reveals = document.querySelectorAll('.reveal');
 
-revealItems.forEach((item) => {
+reveals.forEach((item) => {
   const delay = Number(item.dataset.delay || 0);
   item.style.setProperty('--delay', `${delay}ms`);
 });
 
-if (!reduceMotion && 'IntersectionObserver' in window) {
-  const revealObserver = new IntersectionObserver((entries, observer) => {
+if (reduceMotion || !('IntersectionObserver' in window)) {
+  reveals.forEach((item) => item.classList.add('visible'));
+} else {
+  const observer = new IntersectionObserver((entries, revealObserver) => {
     entries.forEach((entry) => {
       if (!entry.isIntersecting) return;
-      entry.target.classList.add('is-visible');
-      observer.unobserve(entry.target);
+      entry.target.classList.add('visible');
+      revealObserver.unobserve(entry.target);
     });
-  }, { threshold: 0.14, rootMargin: '0px 0px -30px' });
+  }, { threshold: 0.14, rootMargin: '0px 0px -4% 0px' });
 
-  revealItems.forEach((item) => revealObserver.observe(item));
-} else {
-  revealItems.forEach((item) => item.classList.add('is-visible'));
+  reveals.forEach((item) => observer.observe(item));
 }
 
-const counters = document.querySelectorAll('[data-counter]');
-let countersStarted = false;
+const heroImage = document.querySelector('.hero-media img');
 
-function animateCounters() {
-  if (countersStarted) return;
-  countersStarted = true;
+if (!reduceMotion && heroImage) {
+  let ticking = false;
 
-  counters.forEach((element) => {
-    const target = Number(element.dataset.counter);
-    if (reduceMotion) {
-      element.textContent = target;
-      return;
-    }
+  window.addEventListener('scroll', () => {
+    if (ticking || window.scrollY > window.innerHeight * 1.2) return;
 
-    const duration = 900;
-    const start = performance.now();
-
-    function tick(now) {
-      const progress = Math.min((now - start) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      element.textContent = Math.round(target * eased);
-      if (progress < 1) requestAnimationFrame(tick);
-    }
-
-    requestAnimationFrame(tick);
-  });
+    ticking = true;
+    requestAnimationFrame(() => {
+      heroImage.style.transform = `scale(1.02) translateY(${window.scrollY * 0.055}px)`;
+      ticking = false;
+    });
+  }, { passive: true });
 }
 
-const trustRow = document.querySelector('.trust-row');
-if ('IntersectionObserver' in window && trustRow) {
-  const counterObserver = new IntersectionObserver((entries, observer) => {
-    if (!entries[0].isIntersecting) return;
-    animateCounters();
-    observer.disconnect();
-  }, { threshold: 0.4 });
-  counterObserver.observe(trustRow);
-} else {
-  animateCounters();
-}
+const form = document.querySelector('#quick-form');
 
-const billRange = document.querySelector('#bill-range');
-const billOutput = document.querySelector('#bill-output');
-const monthlySaving = document.querySelector('#monthly-saving');
-const annualSaving = document.querySelector('#annual-saving');
-const longSaving = document.querySelector('#long-saving');
-const simWhatsapp = document.querySelector('#sim-whatsapp');
-const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
-
-function updateSimulation() {
-  const bill = Number(billRange.value);
-  const estimatedRate = 0.85;
-  const monthly = bill * estimatedRate;
-  const annual = monthly * 12;
-  const longTerm = annual * 25;
-
-  billOutput.textContent = currency.format(bill);
-  monthlySaving.textContent = currency.format(monthly);
-  annualSaving.textContent = currency.format(annual);
-  longSaving.textContent = currency.format(longTerm);
-
-  const percent = ((bill - Number(billRange.min)) / (Number(billRange.max) - Number(billRange.min))) * 100;
-  billRange.style.background = `linear-gradient(90deg, #c9ff63 ${percent}%, rgba(255,255,255,.16) ${percent}%)`;
-
-  const message = `Olá, vim pelo site da Dalbene. Minha conta média é de aproximadamente ${currency.format(bill)} por mês e quero uma análise real para saber se energia solar faz sentido para mim.`;
-  simWhatsapp.href = `https://wa.me/5519981212923?text=${encodeURIComponent(message)}`;
-}
-
-billRange.addEventListener('input', updateSimulation);
-updateSimulation();
-
-const leadForm = document.querySelector('#lead-form');
-leadForm.addEventListener('submit', (event) => {
+form.addEventListener('submit', (event) => {
   event.preventDefault();
 
-  const name = document.querySelector('#lead-name').value.trim();
-  const city = document.querySelector('#lead-city').value.trim();
-  const bill = document.querySelector('#lead-bill').value.trim();
-  const message = `Olá! Meu nome é ${name}. Moro em ${city} e minha conta média de energia é ${bill}. Vim pelo site da Dalbene e gostaria de receber uma análise inicial para energia solar.`;
-  const url = `https://wa.me/5519981212923?text=${encodeURIComponent(message)}`;
+  const name = document.querySelector('#name').value.trim();
+  const problem = document.querySelector('#problem-type').value;
+  const location = document.querySelector('#location').value.trim();
 
-  window.open(url, '_blank', 'noopener,noreferrer');
+  const parts = [
+    'Olá, vim pelo site da CHP e gostaria de solicitar uma avaliação.',
+    name ? `Meu nome é ${name}.` : '',
+    `O problema é relacionado a ${problem}.`,
+    location ? `Está acontecendo em: ${location}.` : '',
+    'Posso enviar fotos ou vídeos para vocês analisarem?'
+  ].filter(Boolean);
+
+  const message = encodeURIComponent(parts.join(' '));
+  window.open(`https://wa.me/5543991887222?text=${message}`, '_blank', 'noopener');
 });
-
-const tiltTarget = document.querySelector('[data-tilt]');
-const finePointer = window.matchMedia('(pointer: fine)').matches;
-
-if (tiltTarget && finePointer && !reduceMotion) {
-  tiltTarget.addEventListener('pointermove', (event) => {
-    const rect = tiltTarget.getBoundingClientRect();
-    const x = (event.clientX - rect.left) / rect.width - 0.5;
-    const y = (event.clientY - rect.top) / rect.height - 0.5;
-    tiltTarget.style.transform = `perspective(1100px) rotateY(${x * 3.2}deg) rotateX(${y * -2.4}deg) translateY(-2px)`;
-  });
-
-  tiltTarget.addEventListener('pointerleave', () => {
-    tiltTarget.style.transform = 'perspective(1100px) rotateY(-2deg) rotateX(0deg)';
-  });
-}
-
-document.querySelector('#year').textContent = new Date().getFullYear();
